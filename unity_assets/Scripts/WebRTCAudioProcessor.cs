@@ -21,10 +21,6 @@ public class WebRTCAudioProcessor : MonoBehaviour
 
     public static WebRTCAudioProcessor Instance { get; private set; }
 
-    // Debug Hook
-    private AECTestRecorder _debugger;
-    private int _debugFrameCount = 0;
-
     // AEC3 Core
     private AEC3Processor _aec;
     private const int AEC_FRAME_SIZE_MS = 10;
@@ -94,7 +90,6 @@ public class WebRTCAudioProcessor : MonoBehaviour
         
         _outputSampleRate = AudioSettings.outputSampleRate;
 
-        _debugger = GetComponent<AECTestRecorder>();
         StartMicrophone();
     }
 
@@ -116,7 +111,36 @@ public class WebRTCAudioProcessor : MonoBehaviour
             return;
         }
 
-        _micDevice = Microphone.devices[0]; // Use default
+         _micDevice = Microphone.devices[0]; // Default to first device
+
+        // --- NEW: Try to get selection from STTHandler ---
+        STTHandler stt = FindFirstObjectByType<STTHandler>();
+        if (stt != null && !string.IsNullOrEmpty(stt.selectedMicrophoneDeviceName))
+        {
+            string selected = stt.selectedMicrophoneDeviceName;
+            bool found = false;
+            foreach (var d in Microphone.devices)
+            {
+                if (d == selected)
+                {
+                    _micDevice = d;
+                    found = true;
+                    Debug.Log($"[AEC3] Using User-Selected Microphone: {_micDevice}");
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                Debug.LogWarning($"[AEC3] Selected microphone '{selected}' not found. Falling back to default: {_micDevice}");
+            }
+        }
+        else
+        {
+            Debug.Log($"[AEC3] No specific microphone selected in STTHandler (or STTHandler not found). Using default: {_micDevice}");
+        }
+        // -------------------------------------------------
+
         // Request 16kHz if possible, otherwise system default
         int minFreq, maxFreq;
         Microphone.GetDeviceCaps(_micDevice, out minFreq, out maxFreq);
@@ -316,37 +340,14 @@ public class WebRTCAudioProcessor : MonoBehaviour
                     OutputQueue.Enqueue(outCopy);
                 }
             }
+            else
+            {
                 // Passthrough (Bypass AEC)
                 short[] outCopy = new short[_aecFrameSizeSamples];
                 Array.Copy(_shortCapFrame, outCopy, _aecFrameSizeSamples);
                 OutputQueue.Enqueue(outCopy);
             }
-            
-            // Debugging
-            if (_debugger != null && _debugger.IsRecording)
-            {
-                 // Pass copies or ensure writer handles them sync
-                 // Since they are written immediately to file in lock, passing reference is OK if writer copies, 
-                 // but writer writes directly. Let's trust the sync execution in Update.
-                 _debugger.OnAECFrameProcessed(_shortRefFrame, _shortCapFrame, _shortOutFrame);
-            }
-            
-            // RMS Logging (every ~1 sec)
-            _debugFrameCount++;
-            if (_debugFrameCount % 100 == 0)
-            {
-                 float rmsRef = CalculateRMS(_shortRefFrame);
-                 float rmsCap = CalculateRMS(_shortCapFrame);
-                 // Debug.Log($"[AEC Stats] Ref Vol: {rmsRef:F3}, Cap Vol: {rmsCap:F3}");
-            }
         }
-    }
-
-    private float CalculateRMS(short[] samples)
-    {
-        double sum = 0;
-        for(int i=0; i<samples.Length; i++) sum += samples[i]*samples[i];
-        return (float)Math.Sqrt(sum/samples.Length) / 32768f;
     }
 
     private void FloatToShort(float[] input, short[] output)
