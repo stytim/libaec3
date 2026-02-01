@@ -75,11 +75,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Create AEC3 instance
-    aec3_config_t config = {
-        .sample_rate = rec_sample_rate,
-        .num_channels = rec_channels,
-        .export_linear = true
-    };
+    aec3_config_t config;
+    config.sample_rate = rec_sample_rate;
+    config.num_channels = rec_channels;
+    config.export_linear = true;
+    
     aec3_handle_t* aec3 = aec3_create(&config);
     if (!aec3) {
         std::cerr << "Failed to create AEC3 instance" << std::endl;
@@ -112,7 +112,8 @@ int main(int argc, char* argv[]) {
             reinterpret_cast<int16_t*>(aec_tmp.get()),
             output_frame.get(),
             linear_output_frame.get(),
-            samples_per_frame
+            samples_per_frame,
+            0 // buffer_delay
         );
 
         if (ret != 0) {

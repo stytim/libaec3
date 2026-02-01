@@ -314,7 +314,7 @@ static void rftbsub_128_C(float* a) {
 }  // namespace
 
 OouraFft::OouraFft() {
-#if defined(WEBRTC_ARCH_X86_FAMILY)
+#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(WEBRTC_DISABLE_SSE2)
   use_sse2_ = (WebRtc_GetCPUInfo(kSSE2) != 0);
 #else
   use_sse2_ = false;

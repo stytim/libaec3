@@ -45,8 +45,8 @@ namespace AEC3
         /// <param name="outputFrame">Buffer to receive processed output (echo cancelled audio)</param>
         /// <param name="linearOutputFrame">Optional buffer to receive linear AEC output (if enabled)</param>
         /// <param name="audioBufferDelay">Optional audio buffer delay in samples</param>
-        /// <returns>True if processing succeeded, false otherwise</returns>
-        public bool ProcessFrame(short[] referenceFrame, short[] captureFrame, short[] outputFrame, short[] linearOutputFrame = null, int audioBufferDelay = 0)
+        /// <returns>0 on success, non-zero on error</returns>
+        public int ProcessFrame(short[] referenceFrame, short[] captureFrame, short[] outputFrame, short[] linearOutputFrame = null, int audioBufferDelay = 0)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(AEC3Processor));
@@ -68,7 +68,7 @@ namespace AEC3
             // but keeping them for safety is fine for now.
 
             // Call the native function
-            int result = AEC3Native.aec3_process_frame(
+            return AEC3Native.aec3_process_frame(
                 _handle,
                 referenceFrame,
                 captureFrame,
@@ -77,8 +77,6 @@ namespace AEC3
                 (IntPtr)samplesPerChannel,
                 audioBufferDelay
             );
-
-            return result == 0;
         }
 
         /// <summary>

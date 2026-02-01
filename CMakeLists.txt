@@ -375,3 +375,12 @@ install(FILES
 install(FILES api/aec3_api.h
     DESTINATION include
 ) 
+
+# Demo Application
+option(BUILD_DEMO "Build demo application" ON)
+
+if(BUILD_DEMO)
+    add_executable(aec3_demo demo/demo.cc demo/wavreader.c demo/wavwriter.c)
+    target_include_directories(aec3_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+    target_link_libraries(aec3_demo PRIVATE libaec3)
+endif()
