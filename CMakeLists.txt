@@ -44,7 +44,7 @@ set(SYSTEM_WRAPPERS_SOURCES
 
 # Add conditional platform-specific sources
 if(WIN32)
-    list(APPEND SYSTEM_WRAPPERS_SOURCES base/system_wrappers/source/cpu_features_windows.c)
+    # list(APPEND SYSTEM_WRAPPERS_SOURCES base/system_wrappers/source/cpu_features_windows.c)
 elseif(ANDROID)
     list(APPEND SYSTEM_WRAPPERS_SOURCES base/system_wrappers/source/cpu_features_android.c)
 elseif(UNIX)
@@ -174,12 +174,13 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/sse2_stubs.cc [[
 namespace webrtc {
 
 class SincResampler {
-public:
-    void Convolve_SSE(const float* input_ptr, const float* k1, const float* k2, double initial_position);
+private:
+    static float Convolve_SSE(const float* input_ptr, const float* k1, const float* k2, double initial_position);
 };
 
-void SincResampler::Convolve_SSE(const float* input_ptr, const float* k1, const float* k2, double initial_position) {
+float SincResampler::Convolve_SSE(const float* input_ptr, const float* k1, const float* k2, double initial_position) {
     // This should never be called because we disable SSE at compile time
+    return 0.0f;
 }
 
 void cft1st_128_SSE2(float* a) {
@@ -243,7 +244,8 @@ endif()
 
 # Set up platform-specific compile definitions
 if(WIN32)
-    target_compile_definitions(libaec3 PRIVATE WEBRTC_WIN NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(libaec3 PRIVATE WEBRTC_WIN NOMINMAX WIN32_LEAN_AND_MEAN AEC3_EXPORTS)
+    target_link_libraries(libaec3 PRIVATE winmm)
 elseif(APPLE)
     target_compile_definitions(libaec3 PRIVATE WEBRTC_POSIX WEBRTC_MAC)
     # Link CoreFoundation on macOS/iOS
@@ -265,10 +267,17 @@ elseif(UNIX)
 endif()
 
 # Special flags for C files
-set_source_files_properties(
-    audio_processing/splitting_filter_c.c
-    PROPERTIES COMPILE_FLAGS "-include stddef.h"
-)
+if(MSVC)
+    set_source_files_properties(
+        audio_processing/splitting_filter_c.c
+        PROPERTIES COMPILE_FLAGS "/FIstddef.h"
+    )
+else()
+    set_source_files_properties(
+        audio_processing/splitting_filter_c.c
+        PROPERTIES COMPILE_FLAGS "-include stddef.h"
+    )
+endif()
 
 # Add include for stddef.h to fix size_t issue in C files
 if(WIN32)

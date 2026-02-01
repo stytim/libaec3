@@ -18,12 +18,22 @@ typedef struct {
     int export_linear;    // Whether to export linear AEC output
 } aec3_config_t;
 
+#if defined(_WIN32)
+  #if defined(AEC3_EXPORTS)
+    #define AEC3_API __declspec(dllexport)
+  #else
+    #define AEC3_API __declspec(dllimport)
+  #endif
+#else
+  #define AEC3_API __attribute__((visibility("default")))
+#endif
+
 // Create a new AEC3 instance
-aec3_handle_t* aec3_create(const aec3_config_t* config);
+AEC3_API aec3_handle_t* aec3_create(const aec3_config_t* config);
 
 // Process a frame of audio
 // Returns 0 on success, non-zero on error
-int aec3_process_frame(
+AEC3_API int aec3_process_frame(
     aec3_handle_t* handle,
     const int16_t* reference_frame,  // Reference (far-end) audio
     const int16_t* capture_frame,    // Capture (near-end) audio
@@ -34,7 +44,7 @@ int aec3_process_frame(
 );
 
 // Destroy an AEC3 instance
-void aec3_destroy(aec3_handle_t* handle);
+AEC3_API void aec3_destroy(aec3_handle_t* handle);
 
 #ifdef __cplusplus
 }
