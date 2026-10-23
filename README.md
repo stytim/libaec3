@@ -43,6 +43,26 @@ This is a build adaptation for macOS Apple Silicon platform of the original proj
    make -j$(sysctl -n hw.ncpu)
    ```
 
+   arm64 library only (macOS 11+, exports only the `aec3_*` C API):
+   ```bash
+   ./build_macos_arm64.sh   # -> install/macos-arm64/lib/aec3.dylib
+   ```
+
+## Streaming API (real time)
+For live audio, feed the far end and the microphone separately instead of `aec3_process_frame`:
+
+```c
+aec3_handle_t* h = aec3_create_stream(16000, 24000); // capture rate, render rate
+aec3_analyze_render(h, speaker_frame, 240);          // each 10 ms of audio sent to the speakers
+aec3_process_capture(h, mic_frame, 160);             // each 10 ms of microphone audio, in place
+aec3_destroy(h);
+```
+
+- Mono 10 ms frames of floats in [-1, 1]: `rate / 100` samples per call; anything else returns -1.
+- Capture runs at 16, 32 or 48 kHz; render may be any multiple of 100 Hz in [8000, 192000] and is resampled internally.
+- No delay parameter: AEC3 finds the echo delay itself, up to about 0.5 s.
+- Render and capture may be called from different threads (one thread per side). See `api/aec3_api.h`.
+
 ## Usage
 The demo application processes audio files for acoustic echo cancellation:
 
