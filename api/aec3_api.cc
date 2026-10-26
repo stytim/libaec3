@@ -10,6 +10,10 @@
 
 using namespace webrtc;
 
+// AEC3 produces its linear output at 16 kHz regardless of the capture rate.
+constexpr int kLinearOutputRateHz = 16000;
+constexpr size_t kLinearOutputFrameSamples = kLinearOutputRateHz / 100;
+
 struct aec3_handle {
     std::unique_ptr<EchoControl> echo_controller;
     std::unique_ptr<HighPassFilter> hp_filter;
@@ -52,7 +56,6 @@ aec3_handle_t* aec3_create(const aec3_config_t* config) {
         stream_config.sample_rate_hz(), stream_config.num_channels());
 
     if (config->export_linear) {
-        constexpr int kLinearOutputRateHz = 16000;
         handle->aec_linear_audio = std::make_unique<AudioBuffer>(
             kLinearOutputRateHz, stream_config.num_channels(),
             kLinearOutputRateHz, stream_config.num_channels(),
@@ -118,7 +121,6 @@ int aec3_process_frame(
 
     // Copy linear output if requested
     if (linear_output_frame && handle->aec_linear_audio) {
-        constexpr int kLinearOutputRateHz = 16000;
         handle->aec_frame.UpdateFrame(0, nullptr,
             kLinearOutputRateHz / 100, kLinearOutputRateHz,
             AudioFrame::kNormalSpeech, AudioFrame::kVadActive, 1);
@@ -140,21 +142,34 @@ static bool AllFinite(const float* samples, size_t num_samples) {
     return true;
 }
 
-aec3_handle_t* aec3_create_stream(
+static aec3_handle_t* CreateStream(
     int sample_rate_hz,
-    int render_sample_rate_hz) {
+    int render_sample_rate_hz,
+    int export_linear) {
     if (!ValidFullBandRate(sample_rate_hz) ||
         render_sample_rate_hz < 8000 || render_sample_rate_hz > 192000 ||
         render_sample_rate_hz % 100 != 0) {
         return nullptr;
     }
 
-    aec3_config_t config = {sample_rate_hz, 1, 0};
+    aec3_config_t config = {sample_rate_hz, 1, export_linear};
     aec3_handle_t* handle = aec3_create(&config);
     handle->render_sample_rate = render_sample_rate_hz;
     handle->ref_audio = std::make_unique<AudioBuffer>(
         render_sample_rate_hz, 1, sample_rate_hz, 1, sample_rate_hz, 1);
     return handle;
+}
+
+aec3_handle_t* aec3_create_stream(
+    int sample_rate_hz,
+    int render_sample_rate_hz) {
+    return CreateStream(sample_rate_hz, render_sample_rate_hz, 0);
+}
+
+aec3_handle_t* aec3_create_stream_with_linear_output(
+    int sample_rate_hz,
+    int render_sample_rate_hz) {
+    return CreateStream(sample_rate_hz, render_sample_rate_hz, 1);
 }
 
 int aec3_analyze_render(
@@ -174,25 +189,60 @@ int aec3_analyze_render(
     return 0;
 }
 
-int aec3_process_capture(
+static bool ValidCaptureFrame(
+    const aec3_handle_t* handle,
+    const float* capture,
+    size_t num_samples) {
+    return handle && capture && handle->num_channels == 1 &&
+        num_samples == static_cast<size_t>(handle->sample_rate / 100) &&
+        AllFinite(capture, num_samples);
+}
+
+// linear_output may only be non-NULL on an instance that exports it.
+static void ProcessCaptureFrame(
     aec3_handle_t* handle,
     float* capture,
-    size_t num_samples) {
-    if (!handle || !capture || handle->num_channels != 1 ||
-        num_samples != static_cast<size_t>(handle->sample_rate / 100) ||
-        !AllFinite(capture, num_samples)) {
-        return -1;
-    }
-
+    float* linear_output) {
     const StreamConfig stream_config(handle->sample_rate, 1);
     handle->aec_audio->CopyFrom(&capture, stream_config);
     handle->echo_controller->AnalyzeCapture(handle->aec_audio.get());
     handle->aec_audio->SplitIntoFrequencyBands();
     handle->hp_filter->Process(handle->aec_audio.get(), true);
     handle->echo_controller->ProcessCapture(
-        handle->aec_audio.get(), nullptr, false);
+        handle->aec_audio.get(), handle->aec_linear_audio.get(), false);
     handle->aec_audio->MergeFrequencyBands();
     handle->aec_audio->CopyTo(stream_config, &capture);
+    if (linear_output) {
+        handle->aec_linear_audio->CopyTo(
+            StreamConfig(kLinearOutputRateHz, 1), &linear_output);
+    }
+}
+
+int aec3_process_capture(
+    aec3_handle_t* handle,
+    float* capture,
+    size_t num_samples) {
+    if (!ValidCaptureFrame(handle, capture, num_samples)) {
+        return -1;
+    }
+
+    ProcessCaptureFrame(handle, capture, nullptr);
+    return 0;
+}
+
+int aec3_process_capture_with_linear_output(
+    aec3_handle_t* handle,
+    float* capture,
+    size_t num_samples,
+    float* linear_output,
+    size_t num_linear_samples) {
+    if (!ValidCaptureFrame(handle, capture, num_samples) || !linear_output ||
+        !handle->aec_linear_audio ||
+        num_linear_samples != kLinearOutputFrameSamples) {
+        return -1;
+    }
+
+    ProcessCaptureFrame(handle, capture, linear_output);
     return 0;
 }
 

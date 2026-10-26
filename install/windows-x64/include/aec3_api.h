@@ -92,6 +92,29 @@ AEC3_API int aec3_process_capture(
     size_t num_samples
 );
 
+// aec3_create_stream, but the instance also keeps AEC3's linear output: the
+// capture after the adaptive filter has subtracted the echo estimate and
+// before the suppressor. It keeps near-end speech that overlaps the far end
+// (double talk) far better than the processed output, at the cost of more
+// residual echo. Same rates and NULL rules as aec3_create_stream.
+AEC3_API aec3_handle_t* aec3_create_stream_with_linear_output(
+    int sample_rate_hz,
+    int render_sample_rate_hz
+);
+
+// aec3_process_capture that also writes the frame's linear output into
+// linear_output: always 16 kHz, so exactly 160 samples whatever the capture
+// rate. Returns -1, touching neither buffer, if the instance was not created
+// with aec3_create_stream_with_linear_output, num_linear_samples is not 160,
+// or anything aec3_process_capture rejects.
+AEC3_API int aec3_process_capture_with_linear_output(
+    aec3_handle_t* handle,
+    float* capture,
+    size_t num_samples,
+    float* linear_output,
+    size_t num_linear_samples
+);
+
 // Destroy an AEC3 instance
 AEC3_API void aec3_destroy(aec3_handle_t* handle);
 

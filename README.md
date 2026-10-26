@@ -63,6 +63,7 @@ aec3_destroy(h);
 - Capture runs at 16, 32 or 48 kHz; render may be any multiple of 100 Hz in [8000, 192000] and is resampled internally.
 - No delay parameter: AEC3 finds the echo delay itself, up to about 0.5 s.
 - Render and capture may be called from different threads (one thread per side). See `api/aec3_api.h`.
+- For a second, linear output (after the echo estimate is subtracted, before the suppressor), create the instance with `aec3_create_stream_with_linear_output` and call `aec3_process_capture_with_linear_output(h, mic_frame, 160, linear_frame, 160)`. The linear output is always 16 kHz (160 samples per frame) and keeps near-end speech during double talk, with more residual echo than the processed output.
 
 ## Usage
 The demo application processes audio files for acoustic echo cancellation:
