@@ -43,9 +43,10 @@ This is a build adaptation for macOS Apple Silicon platform of the original proj
    make -j$(sysctl -n hw.ncpu)
    ```
 
-   arm64 library only (macOS 11+, exports only the `aec3_*` C API):
+   Library only, arm64 macOS 11+ or x64 Windows (exports only the `aec3_*` C API; run the `.bat` from a Visual Studio developer prompt):
    ```bash
    ./build_macos_arm64.sh   # -> install/macos-arm64/lib/aec3.dylib
+   build_windows_x64.bat   # -> install\windows-x64\bin\aec3.dll
    ```
 
 ## Streaming API (real time)
