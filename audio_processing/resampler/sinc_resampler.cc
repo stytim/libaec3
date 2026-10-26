@@ -122,7 +122,9 @@ double SincScaleFactor(double io_ratio) {
 const size_t SincResampler::kKernelSize;
 
 // If we know the minimum architecture at compile time, avoid CPU detection.
-#if defined(WEBRTC_ARCH_X86_FAMILY)
+// A WEBRTC_DISABLE_SSE2 build links a do-nothing Convolve_SSE stub, so it must
+// never select it.
+#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(WEBRTC_DISABLE_SSE2)
 #if defined(__SSE2__)
 #define CONVOLVE_FUNC Convolve_SSE
 void SincResampler::InitializeCPUSpecificFeatures() {}
@@ -161,12 +163,14 @@ SincResampler::SincResampler(double io_sample_rate_ratio,
           AlignedMalloc(sizeof(float) * kKernelStorageSize, 16))),
       input_buffer_(static_cast<float*>(
           AlignedMalloc(sizeof(float) * input_buffer_size_, 16))),
-#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(__SSE2__)
+#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(WEBRTC_DISABLE_SSE2) && \
+    !defined(__SSE2__)
       convolve_proc_(nullptr),
 #endif
       r1_(input_buffer_.get()),
       r2_(input_buffer_.get() + kKernelSize / 2) {
-#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(__SSE2__)
+#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(WEBRTC_DISABLE_SSE2) && \
+    !defined(__SSE2__)
   InitializeCPUSpecificFeatures();
   RTC_DCHECK(convolve_proc_);
 #endif

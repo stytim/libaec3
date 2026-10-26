@@ -155,7 +155,8 @@ class SincResampler {
 // TODO(ajm): Move to using a global static which must only be initialized
 // once by the user. We're not doing this initially, because we don't have
 // e.g. a LazyInstance helper in webrtc.
-#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(__SSE2__)
+#if defined(WEBRTC_ARCH_X86_FAMILY) && !defined(WEBRTC_DISABLE_SSE2) && \
+    !defined(__SSE2__)
   typedef float (*ConvolveProc)(const float*,
                                 const float*,
                                 const float*,
